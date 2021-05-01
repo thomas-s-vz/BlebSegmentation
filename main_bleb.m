@@ -2,10 +2,10 @@
 close all
 clear all
 clc
-addpath(genpath('/Users/thomas/Documents/MATLAB/added_codes/tiffread2'))
-addpath(genpath('/Users/thomas/Documents/MATLAB/Universal_Code_TvZ'))
-addpath('/Users/thomas/Downloads/Dropbox/Analysis_TVZ/Bleb Analysis Code/')
+addpath('path where all the general functions are located')
+addpath('path where all the specific functions are located')
 pathname=uigetdir; pathname=[pathname '/']; cd(pathname)
+
 %% Section 1: Variable and image loading and conversion %%%%%%%%%%%%%%%%%%%
 ws=80;%width of the ROI. Is either 60 or 80 during bleb selection process
 minR=5;%minimum radius
@@ -19,7 +19,6 @@ avM=6;%thickness of the membrane + PFS (to include in the membrane summation)
 %--> should be an EVEN number and smaller than width
 Bleb.area=[];%initializing the Bleb array to prevent errors in ROIselect.m
 
-
 temp_im1=tiffread2b([pathname 'Ldn_blue.tif'],1,40); 
 for i=1:length(temp_im1), im1(i,:,:)=temp_im1(i).data; end
 temp_im2=tiffread2b([pathname 'Ldn_red.tif'],1,40);
@@ -28,7 +27,8 @@ for i=1:length(temp_im2), im2(i,:,:)=temp_im2(i).data; end
 %for i=1:length(temp_im3), im3(i,:,:)=temp_im3(i).data; end
 
 cam.mode=0; cam.serialNo='0000'; cam.tInt='200ms';%camera settings for more info
-cam.ROI=[0 0 size(temp_im1.data,1) size(temp_im1.data,2)];%see PhotoConvertIm.m
+cam.ROI=[0 0 size(im1,2) size(im1,3)];%see PhotoConvertIm.m
+
 [im1, gain_ch1, offset_ch1] = PhotoConvertIm (im1, cam);
 [im2, gain_ch2, offset_ch2] = PhotoConvertIm (im2, cam);
 %[im3] = PhotoConvertIm (im3, cam, gain_ch2, offset_ch2);
@@ -38,25 +38,24 @@ im1BG=tiffread2([pathname 'BG/BG_blue.tif']);im1BG=double(im1BG.data);
 im2BG=tiffread2([pathname 'BG/BG_red.tif']);im2BG=double(im2BG.data);
 %im3BG=tiffread2([pathname 'BG/BG_640.tif');im3BG=double(im3BG.data);
 %im3BG = PhotoConvertIm (im3BG, cam, gain_ch2, offset_ch2);
-BG(1,:,:) = PhotoConvertIm (im1BG, cam, gain_ch1, offset_ch1); 
-BG(2,:,:) = PhotoConvertIm (im2BG, cam, gain_ch2, offset_ch2);
+im1BG = PhotoConvertIm (im1BG, cam, gain_ch1, offset_ch1); 
+im2BG = PhotoConvertIm (im2BG, cam, gain_ch2, offset_ch2);
+BG(1,:,:) = im1BG; BG(2,:,:) = im2BG;
 im1GF=tiffread2([pathname 'BG/GF_blue.tif']);im1GF=double(im1GF.data);
 im2GF=tiffread2([pathname 'BG/GF_red.tif']);im2GF=double(im2GF.data);
-GF(1,:,:) = PhotoConvertIm (im1GF, cam, gain_ch1, offset_ch1);
-GF(2,:,:) = PhotoConvertIm (im2GF, cam, gain_ch2, offset_ch2);
+im1GF = PhotoConvertIm (im1GF, cam, gain_ch1, offset_ch1);
+im2GF = PhotoConvertIm (im2GF, cam, gain_ch2, offset_ch2);
+GF(1,:,:) = im1GF; GF(2,:,:) = im2GF;
 
-for i=1:size(im1,1)
-    tim1(:,:)=im1(i,:,:);tim2(:,:)=im2(i,:,:);%tim3(:,:)=im3(i,:,:);
-	im1(i,:,:)=ImageCorrection(tim1,im1BG);
-    [im2(i,:,:) GFactor]=ImageCorrection(tim2,BG,'Ldn',GF);
-    %im3(i,:,:)=ImageCorrection(im3,im3BG);
-    clear tim1 tim2 %tim3
-end
+	im1=ImageCorrection(im1,im1BG);
+    [im2 GFactor]=ImageCorrection(im2,BG,'Ldn',GF);
+    %im3=ImageCorrection(im3,im3BG);
 
 im1(find(im1<0))=0;im1(find(im1==Inf))=0;im1(isnan(im1))=0;
 im2(find(im2<0))=0;im2(find(im2==Inf))=0;im2(isnan(im2))=0;
 %im3(find(im3<0))=0;im3(find(im3==Inf))=0;im3(isnan(im3))=0;
 clear temp_im1 temp_im2 temp_im3 im1BG im2BG BG im3BG im1GF im2GF GF
+cd(pathname), save('bleb_fullimages.mat')
 %% Section 2: Indicating the Blebs to be analysed per image %%%%%%%%%%%%%%%
 for j=1:size(im1,1)
     
@@ -82,7 +81,7 @@ delete(roi);
 
     fin=0;
     while fin==0
-       [Bleb, fin] = ROIselect(ch1+ch2, ws, Bleb, size(Bleb,2));
+       [Bleb, fin] = ROIselect(ch1+ch2, ws, 'object', Bleb);
     end
         
     for i=No+1:size(Bleb,2)
@@ -97,8 +96,7 @@ delete(roi);
     close Figure 9
     
 end
-cd(pathname)
-save('bleb_ROIs.mat')
+Bleb(1)=[]; cd(pathname), save('bleb_ROIs.mat', 'Bleb')
 %% Section 3: Centering, aligning and opening up the Bleb for analysis %%%%
 for i=1:size(Bleb,2)
 %% Alligning different channels in Bleb ROI 
@@ -158,15 +156,15 @@ close Figure 11
     hold on
     h=viscircles(centers_out, radii_out,'EdgeColor','b');
 %% Open up Bleb circle to a Bleb rectangular image
-    [Bleb(i).ini, Bleb(i).ind] = OpenUpBlebCP(im, av, width, centers_out, radii_out);
+    [Bleb(i).ini, Bleb(i).ind] = OpenUpBleb(im, av, width, centers_out, radii_out);
     [Bleb(i).ch1, ind] = OpenUpBleb(ch1, av, width, centers_out, radii_out, Bleb(i).ind);
     [Bleb(i).ch2, ind] = OpenUpBleb(ch2, av, width, centers_out, radii_out, Bleb(i).ind);
     %[Bleb(i).ch3, ind] = OpenUpBleb(ch3, av, width, centers_out, radii_out, Bleb(i).ind);
 
 Bleb(i).centers=centers_out;
 Bleb(i).radii=radii_out;
-Bleb(i).AdjustedRadii=mean(size(ch1,2)-Bleb(i).ind);
-Bleb(i).circularity=(4*pi*pi*(Bleb(i).AdjustedRadii^2))/(size(Bleb(i).ch1,2)^2);
+Bleb(i).AdjustedRadii=mean(round(radii_out+width/2)-Bleb(i).ind);
+Bleb(i).circularity=1-(std(round(radii_out+width/2)-Bleb(i).ind)/Bleb(i).AdjustedRadii);
 Bleb(i).metric=metric_out; 
 
 clear r A def Parameters prompt h AddOpts imblur im ch1 ch2 ch3...
@@ -174,10 +172,8 @@ clear r A def Parameters prompt h AddOpts imblur im ch1 ch2 ch3...
 close Figure 1
 end
 Bleb = rmfield(Bleb, 'ini');
-%%
-%GPMV([11, 18])=[];%This will delete the indicated blebs from the file
-cd(pathname)
-save('blebs_identified.mat')
+%Bleb([11, 18])=[];%This will delete the indicated blebs from the file
+cd(pathname), save('blebs_identified.mat','Bleb')
 %% Section 4: Analyzing all the Blebs and extracting relevant data %%%%%%%%
 j=1;
 for i=1:length(Bleb)  
@@ -202,7 +198,8 @@ for i=1:length(Bleb)
     %[Bleb(i).gpR, Bleb(i).gpP] = corrcoef(Bleb(i).gpTrace, Bleb(i).ch3Trace);
     
 %whole bleb values     
-    Bleb(i).totInt=mean(Bleb(i).totTrace); Bleb(i).stdInt=std(Bleb(i).totTrace);
+    Bleb(i).meanInt=mean(Bleb(i).totTrace); Bleb(i).stdInt=std(Bleb(i).totTrace);
+    Bleb(i).totInt=sum(Bleb(i).totTrace);
     %Bleb(i).AN=mean(Bleb(i).anTrace); Bleb(i).ANstd=std(Bleb(i).anTrace);
     Bleb(i).GP=mean(Bleb(i).gpTrace); Bleb(i).GPstd=std(Bleb(i).gpTrace);
 
@@ -221,7 +218,8 @@ for i=1:length(Bleb)
     end    
 end
 CircTOT=CircTOT./nanmean(CircTOT,1); %CircCH3=CircCH3./nanmean(CircCH3,1);
-CircAN=CircAN./nanmean(CircAN,1); CircGP=CircGP./nanmean(CircGP,1);
+%CircAN=CircAN./nanmean(CircAN,1); 
+CircGP=CircGP./nanmean(CircGP,1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%DATA ON BACKGROUND%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %for i=1:length(bleb)
 %   BG(i,:)=Bleb(i).BG;
@@ -229,5 +227,4 @@ CircAN=CircAN./nanmean(CircAN,1); CircGP=CircGP./nanmean(CircGP,1);
 %BGratio=unique(BG(:,1)./BG(:,2));
 %BGtotal=unique(BG(:,1)+BG(:,2));
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-cd(pathname)
-save('blebs_analysed_final.mat')
+cd(pathname), save('blebs_analysed_final.mat')
