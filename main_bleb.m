@@ -1,3 +1,4 @@
+%main_bleb has been written by Thomas S van Zanten last update 15th April 2021
 %% Section 0: Initialisation %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 close all
 clear all
@@ -5,7 +6,6 @@ clc
 addpath('path where all the general functions are located')
 addpath('path where all the specific functions are located')
 pathname=uigetdir; pathname=[pathname '/']; cd(pathname)
-
 %% Section 1: Variable and image loading and conversion %%%%%%%%%%%%%%%%%%%
 ws=80;%width of the ROI. Is either 60 or 80 during bleb selection process
 minR=5;%minimum radius
