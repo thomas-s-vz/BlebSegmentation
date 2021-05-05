@@ -3,7 +3,7 @@
 %       (2)imBG:    background image, should be a single image if only
 %                   background correction needs to be performed. Needs to contain the
 %                   2 channels if Gfactor correction is also performed (ch,:,:).
-%       (3)type:    'Ldn' for laurdan Gfactor correction, 'An' for
+%       (3)type:    'Ldn' for laurdan Gfactor correction, 'Ani' for
 %                   anisotropy Gfactor correction
 %       (4)imGF:    the two channel Gfactor images (ch,:,:)
 %       (5)tFORM:   Image transform to align all ch2's
@@ -38,24 +38,24 @@ else
                     tFORM=affine2d([1 0 0; 0 1 0; 0 0 1]);
                 end
     BGch1(:,:)=imBG(1,:,:);BGch1(:,:)=medfilt2(BGch1,[9 9]);
-    BGch2(:,:)=imBG(2,:,:); BGch2 = imwarp(BGch2,tFORM,'OutputView',imref2d(size(BGch1))); BGch2(:,:)=medfilt2(BGch2,[9 9]);
+    BGch2(:,:)=imBG(2,:,:); BGch2(:,:)=medfilt2(BGch2,[9 9]);
 
         if type=='Ldn'
             imGFch1(:,:)=imGF(1,:,:); imGFch1=imGFch1-BGch1; imGFch1=medfilt2(imGFch1,[9 9]);
             
-            imGFch2(:,:)=imGF(2,:,:); 
+            imGFch2(:,:)=imGF(2,:,:); imGFch2=imGFch2-BGch2;
             imGFch2 = imwarp(imGFch2,tFORM,'OutputView',imref2d(size(imGFch1)));
-            imGFch2=imGFch2-BGch2; imGFch2=medfilt2(imGFch2,[9 9]);
+            imGFch2=medfilt2(imGFch2,[9 9]);
             
             gp=(imGFch1-imGFch2)./(imGFch1+imGFch2);
             GFactor=(0.208+0.208*gp-gp-1)./(gp+0.208*gp-0.208-1);
             GFactor(find(abs(GFactor)==Inf))=0; GFactor(isnan(GFactor))=0;
-        elseif type=='An'
+        elseif type=='Ani'
             imGFch1(:,:)=imGF(1,:,:); imGFch1=imGFch1-BGch1; imGFch1=medfilt2(imGFch1,[9 9]);
             
-            imGFch2(:,:)=imGF(2,:,:);
+            imGFch2(:,:)=imGF(2,:,:); imGFch2=imGFch2-BGch2;
             imGFch2 = imwarp(imGFch2,tFORM,'OutputView',imref2d(size(imGFch1)));
-            imGFch2=imGFch2-BGch2; imGFch2=medfilt2(imGFch2,[9 9]);
+            imGFch2=medfilt2(imGFch2,[9 9]);
             
             GFactor=imGFch1./imGFch2;
             GFactor(find(abs(GFactor)==Inf))=0; GFactor(isnan(GFactor))=0;
@@ -64,10 +64,13 @@ else
 	for i=1:frames
         waitbar(i/frames,wb);
      	if frames==1
-        	im_corr=(double(im)-BGch2).*GFactor;
+        	im_corr=(double(im)-BGch2); 
+            im_corr = imwarp(im_corr,tFORM,'OutputView',imref2d(size(im_corr)));
+            im_corr = im_corr.*GFactor;
       	elseif frames>1
-          	temp_im(:,:)=double(im(i,:,:));
-           	im_corr(i,:,:)=(temp_im-BGch2).*GFactor;
+          	temp_im(:,:) = double(im(i,:,:))-BGch2;
+            temp_im = imwarp(im_corr,tFORM,'OutputView',imref2d(size(im_corr)));
+           	im_corr(i,:,:) = temp_im.*GFactor;
         end  
  	end
         
